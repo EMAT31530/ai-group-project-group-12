@@ -94,8 +94,8 @@ def rewards(states, actions, state_dict = state_dict()):
     R = np.zeros((len(states), len(actions)))
     
     for i in range(len(states)):
-        R[i][0] = states[i][2] + states[i][1] - card_point_tally([val for idx, val in enumerate(states[i]) if idx not in [1,2]])
-        R[i][1] = states[i][2] - card_point_tally(states[i][3:12]) - 1
+        R[i][0] = states[i][2] + states[i][1] + card_point_tally([val for idx, val in enumerate(states[i]) if idx not in [1,2]])
+        R[i][1] = states[i][2] + card_point_tally(states[i][3:12]) - 1
     
     R = pd.DataFrame(data = R, columns = actions, index = state_dict.values())
     
@@ -243,13 +243,13 @@ class QLearningAgent(object):
 
         try:
             self.q = pd.read_csv('q-table.csv', header=0)
-            self.q.drop(self.q[[0]], axis=1, inplace=True)
-            print(self.q)
+            self.q.drop(self.q.columns[[0]], axis=1, inplace=True)
+        
         except:
-            print("didnt read")
+            # print("didnt read")
             self.q = pd.DataFrame(data = np.zeros((len(self.states),len(self.actions))), columns = self.actions, index = self.state_dict.values())
         self.visit = self.q.copy()
-        
+
     def step(self, state_dict, actions_dict):
         """
         Choose the optimal next action according to the followed policy.
@@ -272,6 +272,7 @@ class QLearningAgent(object):
             actions_possible = [key for key,val in actions_dict.items() if val != 0]
             random.shuffle(actions_possible)
             val_max = 0
+            action = "take"
             
             for i in actions_possible:
                 val = self.q.loc[state,i]
@@ -308,10 +309,10 @@ class QLearningAgent(object):
         # (2) Save and return action/state
         self.prev_state = self.state_dict[str(state_dict)]
         self.prev_action = action
-        '''
-        if i % 1 == 0:
+        
+        if i % 50000 == 0:
             self.q.to_csv('q-table itr '+str(i)+'.csv')
-        '''   
+        
 # 3. Deck
 # ----------------------------------------------------------------------------
 
@@ -471,14 +472,14 @@ class Player(object):
         self.action = agent.step(self.state, self.actions)
         
         if self.action == "take":
-            # print("Take")
+            #print("Take")
             player.take_card_agent(player, deck, i)
             
         else:  
             if algorithm == "q-learning":
                 agent.update(self.state, self.action, i)
             
-            # print("Pass")
+            #print("Pass")
             player.pass_card() 
         
     def rand_play(self, player, deck):
@@ -487,7 +488,7 @@ class Player(object):
         they are out of chips.
         """
         global chip_pool
-        decision = random.randint(0,1)
+        decision = random.randint(0,2)
         
         if self.chip_hand == 0:
             decision = 0
@@ -568,9 +569,9 @@ class Game(object):
             if turn_no == 1:
                 self.player_1.draw_card_agent(deck, self.player_1, i)
             elif turn_no == 2:
-                self.player_2.draw_card_rand(deck, self.player_2)
+                self.player_2.draw_card_weighted(deck, self.player_2)
             elif turn_no == 3:
-                self.player_3.draw_card_rand(deck, self.player_3)
+                self.player_3.draw_card_weighted(deck, self.player_3)
         
         else:
             turn_no = 1
@@ -584,10 +585,10 @@ class Game(object):
                 self.player_1.play_agent(self.player_1, deck, i)
                 
             if turn_no % 3 == 2:
-                self.player_2.rand_play(self.player_2, deck)
+                self.player_2.weighted_play(self.player_2, deck)
                 
             if turn_no % 3 == 0:
-                self.player_3.rand_play(self.player_3, deck)
+                self.player_3.weighted_play(self.player_3, deck)
                 
         else:
             P1_total = self.player_1.point_tally()
@@ -624,9 +625,9 @@ def Tournament(player_1, player_2, player_3, match_no, algo, agent_info):
         
     print(tally)
              
-agent_init_info = {"epsilon":0, "step_size":0, "new_model":True}
+agent_init_info = {"epsilon":0.2, "step_size":0.2, "new_model":True}
             
-Tournament('Alice', 'Bob', 'Charlie', 1, "q-learning", agent_init_info)
+Tournament('Alice', 'Bob', 'Charlie', 250000, "q-learning", agent_init_info)
 
 
 
